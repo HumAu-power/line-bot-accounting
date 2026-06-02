@@ -47,14 +47,14 @@ def get_sheet():
 
     # สร้าง header ถ้ายังไม่มี
     if worksheet.row_count == 0 or worksheet.cell(1, 1).value != "วันที่/เวลา":
-        worksheet.insert_row(["วันที่/เวลา", "จำนวนเงิน (บาท)", "Memo", "บันทึกเมื่อ"], 1)
+        worksheet.insert_row(["วันที่/เวลา", "จำนวนเงิน (บาท)", "Memo", "ธนาคาร", "บันทึกเมื่อ"], 1)
     return worksheet
 
 
-def append_to_sheet(date_time: str, amount: str, memo: str):
+def append_to_sheet(date_time: str, amount: str, memo: str, bank: str):
     sheet = get_sheet()
     recorded_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    sheet.append_row([date_time, amount, memo, recorded_at])
+    sheet.append_row([date_time, amount, memo, bank, recorded_at])
 
 
 # ───── Claude Vision ─────
@@ -81,7 +81,7 @@ def extract_slip_data(image_bytes: bytes) -> dict:
                         "type": "text",
                         "text": (
                             "นี่คือสลิปโอนเงิน กรุณาอ่านข้อมูลต่อไปนี้และตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น:\n"
-                            '{"date_time": "YYYY-MM-DD HH:MM", "amount": "ตัวเลขเท่านั้น ไม่มีหน่วย", "memo": "ข้อความ memo หรือ NaN ถ้าไม่มี"}\n'
+                            '{"date_time": "YYYY-MM-DD HH:MM", "amount": "ตัวเลขเท่านั้น ไม่มีหน่วย", "memo": "ข้อความ memo หรือ NaN ถ้าไม่มี", "bank": "ชื่อธนาคาร เช่น กสิกรไทย, ไทยพาณิชย์, กรุงเทพ, กรุงไทย, ทหารไทยธนชาต หรือ NaN ถ้าไม่ทราบ"}\n'
                             "ถ้าอ่านข้อมูลใดไม่ได้ให้ใส่ NaN"
                         ),
                     },
@@ -128,11 +128,13 @@ def handle_image(event: MessageEvent):
             date_time = data.get("date_time", "NaN")
             amount = data.get("amount", "NaN")
             memo = data.get("memo", "NaN")
+            bank = data.get("bank", "NaN")
 
-            append_to_sheet(date_time, amount, memo)
+            append_to_sheet(date_time, amount, memo, bank)
 
             reply_text = (
                 f"✅ บันทึกแล้ว!\n"
+                f"🏦 ธนาคาร: {bank}\n"
                 f"📅 วันที่/เวลา: {date_time}\n"
                 f"💰 จำนวน: {amount} บาท\n"
                 f"📝 Memo: {memo}"
