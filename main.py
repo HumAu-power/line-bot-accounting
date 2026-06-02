@@ -35,7 +35,7 @@ anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 # ───── Google Sheets setup ─────
-def get_sheet():
+def get_sheet(user_id: str):
     creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
     creds = Credentials.from_service_account_info(
         creds_dict,
@@ -43,7 +43,12 @@ def get_sheet():
     )
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(GOOGLE_SHEETS_ID)
-    worksheet = sh.sheet1
+
+    # ใช้ชื่อ sheet เป็น user_id — สร้างใหม่ถ้ายังไม่มี
+    try:
+        worksheet = sh.worksheet(user_id)
+    except gspread.exceptions.WorksheetNotFound:
+        worksheet = sh.add_worksheet(title=user_id, rows=1000, cols=10)
 
     # สร้าง header ถ้ายังไม่มี
     if worksheet.row_count == 0 or worksheet.cell(1, 1).value != "วันที่/เวลา":
@@ -51,8 +56,8 @@ def get_sheet():
     return worksheet
 
 
-def append_to_sheet(date_time: str, amount: str, memo: str, bank: str):
-    sheet = get_sheet()
+def append_to_sheet(user_id: str, date_time: str, amount: str, memo: str, bank: str):
+    sheet = get_sheet(user_id)
     recorded_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     sheet.append_row([date_time, amount, memo, bank, recorded_at])
 
@@ -129,8 +134,9 @@ def handle_image(event: MessageEvent):
             amount = data.get("amount", "NaN")
             memo = data.get("memo", "NaN")
             bank = data.get("bank", "NaN")
+            user_id = event.source.user_id
 
-            append_to_sheet(date_time, amount, memo, bank)
+            append_to_sheet(user_id, date_time, amount, memo, bank)
 
             reply_text = (
                 f"✅ บันทึกแล้ว!\n"
