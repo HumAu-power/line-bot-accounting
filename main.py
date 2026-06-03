@@ -44,14 +44,14 @@ def get_sheet(user_id: str):
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(GOOGLE_SHEETS_ID)
 
+    # ตัด user_id ให้ไม่เกิน 30 ตัวอักษร (Google Sheets จำกัดชื่อ tab)
+    sheet_name = user_id[:30]
+
     # ใช้ชื่อ sheet เป็น user_id — สร้างใหม่ถ้ายังไม่มี
     try:
-        worksheet = sh.worksheet(user_id)
+        worksheet = sh.worksheet(sheet_name)
     except gspread.exceptions.WorksheetNotFound:
-        worksheet = sh.add_worksheet(title=user_id, rows=1000, cols=10)
-
-    # สร้าง header ถ้ายังไม่มี
-    if worksheet.row_count == 0 or worksheet.cell(1, 1).value != "วันที่/เวลา":
+        worksheet = sh.add_worksheet(title=sheet_name, rows=1000, cols=10)
         worksheet.insert_row(["วันที่/เวลา", "จำนวนเงิน (บาท)", "Memo", "ธนาคาร", "บันทึกเมื่อ"], 1)
     return worksheet
 
@@ -136,7 +136,14 @@ def handle_image(event: MessageEvent):
             bank = data.get("bank", "NaN")
             user_id = event.source.user_id
 
-            append_to_sheet(user_id, date_time, amount, memo, bank)
+            # ดึง display name จาก LINE
+            try:
+                profile = line_bot_api.get_profile(user_id)
+                sheet_name = f"{profile.display_name}_{user_id[:8]}"[:30]
+            except Exception:
+                sheet_name = user_id[:30]
+
+            append_to_sheet(sheet_name, date_time, amount, memo, bank)
 
             reply_text = (
                 f"✅ บันทึกแล้ว!\n"
