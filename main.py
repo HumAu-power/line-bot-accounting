@@ -85,8 +85,10 @@ def extract_slip_data(image_bytes: bytes) -> dict:
                     {
                         "type": "text",
                         "text": (
-                            "นี่คือสลิปโอนเงิน กรุณาอ่านข้อมูลต่อไปนี้และตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น:\n"
-                            '{"date_time": "YYYY-MM-DD HH:MM", "amount": "ตัวเลขเท่านั้น ไม่มีหน่วย", "memo": "ข้อความ memo หรือ NaN ถ้าไม่มี", "bank": "ชื่อธนาคาร เช่น กสิกรไทย, ไทยพาณิชย์, กรุงเทพ, กรุงไทย, ทหารไทยธนชาต หรือ NaN ถ้าไม่ทราบ"}\n'
+                            "ดูรูปนี้แล้วตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น\n"
+                            "ถ้าไม่ใช่สลิปโอนเงิน ให้ตอบ: {\"is_slip\": false}\n"
+                            "ถ้าเป็นสลิปโอนเงิน ให้ตอบ:\n"
+                            '{"is_slip": true, "date_time": "YYYY-MM-DD HH:MM", "amount": "ตัวเลขเท่านั้น ไม่มีหน่วย", "memo": "ข้อความ memo หรือ NaN ถ้าไม่มี", "bank": "ชื่อธนาคาร เช่น กสิกรไทย, ไทยพาณิชย์, กรุงเทพ, กรุงไทย, ทหารไทยธนชาต หรือ NaN ถ้าไม่ทราบ"}\n'
                             "ถ้าอ่านข้อมูลใดไม่ได้ให้ใส่ NaN"
                         ),
                     },
@@ -130,28 +132,32 @@ def handle_image(event: MessageEvent):
 
         try:
             data = extract_slip_data(image_bytes)
-            date_time = data.get("date_time", "NaN")
-            amount = data.get("amount", "NaN")
-            memo = data.get("memo", "NaN")
-            bank = data.get("bank", "NaN")
-            user_id = event.source.user_id
 
-            # ดึง display name จาก LINE
-            try:
-                profile = line_bot_api.get_profile(user_id)
-                sheet_name = f"{profile.display_name}_{user_id[:8]}"[:30]
-            except Exception:
-                sheet_name = user_id[:30]
+            if not data.get("is_slip", False):
+                return
+            else:
+                date_time = data.get("date_time", "NaN")
+                amount = data.get("amount", "NaN")
+                memo = data.get("memo", "NaN")
+                bank = data.get("bank", "NaN")
+                user_id = event.source.user_id
 
-            append_to_sheet(sheet_name, date_time, amount, memo, bank)
+                # ดึง display name จาก LINE
+                try:
+                    profile = line_bot_api.get_profile(user_id)
+                    sheet_name = f"{profile.display_name}_{user_id[:8]}"[:30]
+                except Exception:
+                    sheet_name = user_id[:30]
 
-            reply_text = (
-                f"✅ บันทึกแล้ว!\n"
-                f"🏦 ธนาคาร: {bank}\n"
-                f"📅 วันที่/เวลา: {date_time}\n"
-                f"💰 จำนวน: {amount} บาท\n"
-                f"📝 Memo: {memo}"
-            )
+                append_to_sheet(sheet_name, date_time, amount, memo, bank)
+
+                reply_text = (
+                    f"✅ บันทึกแล้ว!\n"
+                    f"🏦 ธนาคาร: {bank}\n"
+                    f"📅 วันที่/เวลา: {date_time}\n"
+                    f"💰 จำนวน: {amount} บาท\n"
+                    f"📝 Memo: {memo}"
+                )
         except Exception as e:
             reply_text = f"❌ อ่านสลิปไม่สำเร็จ: {str(e)}"
 
